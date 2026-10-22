@@ -25,6 +25,15 @@ $fxJars = foreach ($module in @("base", "controls", "fxml", "graphics")) {
 }
 $fxPath = $fxJars -join ";"
 
+# Maven escriu la llista de llibreries del pom (Gson, Java-WebSocket...)
+mvn -q dependency:build-classpath "-Dmdep.outputFile=target/classpath.txt"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+# Traiem JavaFX d'aquesta llista perquè ja va al module-path
+$deps = (Get-Content target/classpath.txt -Raw).Trim().Split(";") |
+    Where-Object { $_ -notmatch "openjfx" }
+$depsPath = $deps -join ";"
+
 java --module-path $fxPath --add-modules javafx.controls,javafx.fxml `
-    -cp target/classes $mainClass
+    -cp "target/classes;$depsPath" $mainClass
 exit $LASTEXITCODE
