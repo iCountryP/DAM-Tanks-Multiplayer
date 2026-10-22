@@ -31,6 +31,20 @@
             <artifactId>javafx-fxml</artifactId>
             <version>22</version>
         </dependency>
+        
+        <!-- Leer y escribir mensajes JSON -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.13.2</version>
+        </dependency>
+
+        <!-- Cliente WebSocket -->
+        <dependency>
+            <groupId>org.java-websocket</groupId>
+            <artifactId>Java-WebSocket</artifactId>
+            <version>1.5.7</version>
+        </dependency>
     </dependencies>
     <profiles>
         <profile>

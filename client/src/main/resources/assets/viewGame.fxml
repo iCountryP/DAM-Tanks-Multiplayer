@@ -17,7 +17,7 @@
          <children>
             <Label fx:id="lblPlayer1" text="Jugador 1" />
             <Region prefHeight="200.0" prefWidth="200.0" HBox.hgrow="ALWAYS" />
-            <Label fx:id="lblEscenario" text="Escenario: " />
+            <Label fx:id="lblScenario" text="Escenario: " />
             <Region prefHeight="200.0" prefWidth="200.0" HBox.hgrow="ALWAYS" />
             <Label fx:id="lblPlayer2" text="Jugador 2" />
          </children>

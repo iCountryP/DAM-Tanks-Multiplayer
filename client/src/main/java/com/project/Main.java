@@ -7,6 +7,9 @@ import javafx.stage.Stage;
 
 public class Main extends Application {
 
+    // Conexión con el servidor, compartida por todas las vistas
+    public static GameClient client;
+
     @Override
     public void start(Stage stage) throws Exception {
 
@@ -16,7 +19,7 @@ public class Main extends Application {
         UtilsViews.addView(getClass(), "ViewResult", "/assets/viewResult.fxml");
         UtilsViews.addView(getClass(), "ViewGame", "/assets/viewGame.fxml");
 
-        UtilsViews.setView("ViewGame");
+        UtilsViews.setView("ViewConnect");
         
         Scene scene = new Scene(UtilsViews.parentContainer);
         

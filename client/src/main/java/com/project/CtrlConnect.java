@@ -23,6 +23,14 @@ public class CtrlConnect {
         }
         lblError.setText("");
 
+        try {
+            Main.client = new GameClient(txtServer.getText().trim(), name);
+            Main.client.connect();
+        } catch (Exception e) {
+            lblError.setText("Dirección de servidor incorrecta");
+            return;
+        }
+
         UtilsViews.setView("ViewWaiting");
     }
 }
