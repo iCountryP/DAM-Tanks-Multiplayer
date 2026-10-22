@@ -14,8 +14,9 @@ public class Main extends Application {
         UtilsViews.addView(getClass(), "ViewConnect", "/assets/viewConnect.fxml");
         UtilsViews.addView(getClass(), "ViewWaiting", "/assets/viewWaiting.fxml");
         UtilsViews.addView(getClass(), "ViewResult", "/assets/viewResult.fxml");
-        
-        UtilsViews.setView("ViewConnect");
+        UtilsViews.addView(getClass(), "ViewGame", "/assets/viewGame.fxml");
+
+        UtilsViews.setView("ViewGame");
         
         Scene scene = new Scene(UtilsViews.parentContainer);
         
