@@ -53,6 +53,12 @@ public class CtrlGame implements Initializable{
 
     private final List<Bullet> bullets = new ArrayList<>();
 
+    private final List<Explosion> explosions = new ArrayList<>();
+    private long lastNanos = 0;
+
+    private static final int MAX_BULLETS = 3;
+    private int myActiveBullets = 0;
+
     // Tanques que dibujamos (más adelante los moverá el STATE)
     private final Tank tank1 = new Tank(new Point2D(100, 250), 0, 0, Color.DODGERBLUE);
     private final Tank tank2 = new Tank(new Point2D(700, 250), 180, 180, Color.DARKGOLDENROD);
@@ -65,7 +71,7 @@ public class CtrlGame implements Initializable{
             new Consumer<Double>() {
                 @Override
                 public void accept(Double fps) {
-                    // La lógica la hace el servidor
+                    updateExplosions();
                 }
             },
             new Runnable() {
@@ -87,6 +93,25 @@ public class CtrlGame implements Initializable{
         });
     }
 
+    // Avanza la animación de las explosiones según el tiempo transcurrido
+    private void updateExplosions() {
+        long now = System.nanoTime();
+        double dt = 0;
+        if (lastNanos != 0) {
+            dt = (now - lastNanos) / 1_000_000_000.0;
+        }
+        lastNanos = now;
+
+        List<Explosion> finished = new ArrayList<>();
+        for (Explosion explosion : explosions) {
+            explosion.update(dt);
+            if (explosion.isFinished()) {
+                finished.add(explosion);
+            }
+        }
+        explosions.removeAll(finished);
+    }
+
     private void redraw() {
         gc.setFill(Color.WHITESMOKE);
         gc.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
@@ -102,15 +127,26 @@ public class CtrlGame implements Initializable{
         tank1.draw(gc);
         tank2.draw(gc);
 
-        Tank myTank = getMyTank();
-        target.drawGuide(gc, myTank, walls);
-        target.draw(gc, myTank);
+        for (Explosion explosion : explosions) {
+            explosion.draw(gc);
+        }
+
+        if (myActiveBullets < MAX_BULLETS) {
+            Tank myTank = getMyTank();
+            target.drawGuide(gc, myTank, walls);
+            target.draw(gc, myTank);
+        }
     }
 
     public void updateState(JsonObject msg) {
         for (JsonElement element : msg.getAsJsonArray("players")) {
             JsonObject player = element.getAsJsonObject();
             int id = player.get("id").getAsInt();
+            
+            if (Main.client != null && id == Main.client.getPlayerId()) {
+                myActiveBullets = player.get("activeBullets").getAsInt();
+            }
+
             Tank tank;
 
             if (id == 1) {
@@ -140,6 +176,27 @@ public class CtrlGame implements Initializable{
 
             bullets.add(new Bullet(position, angle, 0));
         }
+
+        for (JsonElement element : msg.getAsJsonArray("explosions")) {
+            JsonObject explosion = element.getAsJsonObject();
+
+            double x = explosion.get("x").getAsDouble();
+            double y = explosion.get("y").getAsDouble();
+            double radius = explosion.get("radius").getAsDouble();
+
+            if (!hasExplosionAt(x, y)) {
+                explosions.add(new Explosion(x, y, radius, 0.4));
+            }
+        }
+    }
+
+    private boolean hasExplosionAt(double x, double y) {
+        for (Explosion explosion : explosions) {
+            if (explosion.getPosition().getX() == x && explosion.getPosition().getY() == y) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String buildPlayerText(JsonObject player) {
@@ -254,6 +311,7 @@ public class CtrlGame implements Initializable{
     public void startGame(JsonObject msg) {
         lblScenario.setText("Escenario: " + msg.get("scenario").getAsString());
 
+        explosions.clear();
         bullets.clear();
         walls.clear();
         for (JsonElement element : msg.getAsJsonArray("walls")) {
