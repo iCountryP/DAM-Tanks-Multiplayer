@@ -13,7 +13,8 @@ public class GameClient extends WebSocketClient {
 
     private final String playerName;
     private int playerId;
-    
+    private boolean stateShown = false;
+
     public int getPlayerId() {
         return playerId;
     }
@@ -42,6 +43,9 @@ public class GameClient extends WebSocketClient {
         
         if (!type.equals("STATE")) {
             System.out.println("Recibido: " + message);
+        } else if (!stateShown) {
+            System.out.println("Primer STATE: " + message);
+            stateShown = true;
         }
 
         Platform.runLater(new Runnable() {
@@ -63,6 +67,7 @@ public class GameClient extends WebSocketClient {
         } else if (type.equals("COUNTDOWN")) {
             ctrlWaiting.showCountdown(msg.get("seconds").getAsInt());
         } else if (type.equals("START")) {
+            ctrlGame.startGame(msg);
             UtilsViews.setView("ViewGame");
         } else if (type.equals("STATE")) {
             ctrlGame.updateState(msg);
