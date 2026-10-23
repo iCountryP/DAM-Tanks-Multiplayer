@@ -59,6 +59,7 @@ public class GameClient extends WebSocketClient {
     private void handleMessage(String type, JsonObject msg) {
         CtrlWaiting ctrlWaiting = (CtrlWaiting) UtilsViews.getController("ViewWaiting");
         CtrlGame ctrlGame = (CtrlGame) UtilsViews.getController("ViewGame");
+        CtrlResult ctrlResult = (CtrlResult) UtilsViews.getController("ViewResult");
 
         if (type.equals("WELCOME")) {
             playerId = msg.get("playerId").getAsInt();
@@ -71,6 +72,15 @@ public class GameClient extends WebSocketClient {
             UtilsViews.setView("ViewGame");
         } else if (type.equals("STATE")) {
             ctrlGame.updateState(msg);
+        } else if (type.equals("GAME_OVER")) {
+            String winner = msg.get("winner").getAsString();
+            String loser = msg.get("loser").getAsString();
+            ctrlResult.showResult(winner, loser);
+            UtilsViews.setView("ViewResult");
+        } else if (type.equals("REMATCH_WAITING")) {
+            int ready = msg.get("ready").getAsInt();
+            int total = msg.get("total").getAsInt();
+            ctrlWaiting.showRematch(ready, total);
         }
     }
 

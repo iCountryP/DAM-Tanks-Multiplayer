@@ -1,5 +1,7 @@
 package com.project;
 
+import com.google.gson.JsonObject;
+
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 
@@ -17,7 +19,15 @@ public class CtrlResult {
 
     @FXML
     private void actionBack() {
-        // TODO: cerrar la conexión (paso WebSocket)
-        UtilsViews.setView("ViewConnect");
+        if (Main.client == null || !Main.client.isOpen()) {
+            UtilsViews.setView("ViewConnect");
+            return;
+        }
+
+        JsonObject msg = new JsonObject();
+        msg.addProperty("type", "READY");
+        Main.client.send(msg.toString());
+
+        UtilsViews.setView("ViewWaiting");
     }
 }

@@ -19,4 +19,10 @@ public class CtrlWaiting {
         lblStatus.setText("Rival encontrado! Empeiza en");
         lblCountdown.setText(String.valueOf(seconds));
     }
+    
+    // Al recibir REMATCH_WAITING
+    public void showRematch(int ready, int total) {
+        lblStatus.setText("Esperando revancha: " + ready + "/" + total + " listos");
+        lblCountdown.setText("");
+    }
 }

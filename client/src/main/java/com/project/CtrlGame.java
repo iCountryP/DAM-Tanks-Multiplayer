@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.MouseButton;
 
 public class CtrlGame implements Initializable{
     
@@ -49,6 +50,8 @@ public class CtrlGame implements Initializable{
     private final List<ObjectStatic> walls = new ArrayList<>();
 
     private final Target target = new Target();
+
+    private final List<Bullet> bullets = new ArrayList<>();
 
     // Tanques que dibujamos (más adelante los moverá el STATE)
     private final Tank tank1 = new Tank(new Point2D(100, 250), 0, 0, Color.DODGERBLUE);
@@ -92,6 +95,10 @@ public class CtrlGame implements Initializable{
             wall.draw(gc);
         }
 
+        for (Bullet bullet : bullets) {
+            bullet.draw(gc);
+        }
+
         tank1.draw(gc);
         tank2.draw(gc);
 
@@ -123,6 +130,15 @@ public class CtrlGame implements Initializable{
             } else {
                 lblPlayer2.setText(text);
             }
+        }
+        bullets.clear();
+        for (JsonElement element : msg.getAsJsonArray("bullets")) {
+            JsonObject bullet = element.getAsJsonObject();
+
+            Point2D position = new Point2D(bullet.get("x").getAsDouble(), bullet.get("y").getAsDouble());
+            double angle = bullet.get("angle").getAsDouble();
+
+            bullets.add(new Bullet(position, angle, 0));
         }
     }
 
@@ -165,6 +181,16 @@ public class CtrlGame implements Initializable{
             @Override
             public void handle(MouseEvent event) {
                 onMouseMoved(event.getX(), event.getY());
+            }
+        });
+
+        canvas.setOnMousePressed(new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                onMouseMoved(event.getX(), event.getY());
+                if (event.getButton() == MouseButton.PRIMARY) {
+                    sendFire();
+                }
             }
         });
     }
@@ -228,6 +254,7 @@ public class CtrlGame implements Initializable{
     public void startGame(JsonObject msg) {
         lblScenario.setText("Escenario: " + msg.get("scenario").getAsString());
 
+        bullets.clear();
         walls.clear();
         for (JsonElement element : msg.getAsJsonArray("walls")) {
             JsonObject wall = element.getAsJsonObject();
@@ -265,5 +292,16 @@ public class CtrlGame implements Initializable{
             return tank2;
         }
         return tank1;
+    }
+
+    private void sendFire() {
+        if (Main.client == null || !Main.client.isOpen()) {
+            return;
+        }
+
+        JsonObject msg = new JsonObject();
+        msg.addProperty("type", "FIRE");
+
+        Main.client.send(msg.toString());
     }
 }
