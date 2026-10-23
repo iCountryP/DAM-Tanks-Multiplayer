@@ -1,23 +1,30 @@
 package com.project;
 
 import javafx.application.Application;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 public class Main extends Application {
 
+    // Conexión con el servidor, compartida por todas las vistas
+    public static GameClient client;
+
     @Override
     public void start(Stage stage) throws Exception {
 
-        // Carrega l'única vista de l'exemple
-        Parent root = FXMLLoader.load(getClass().getResource("/assets/layout.fxml"));
-        Scene scene = new Scene(root);
+        
+        UtilsViews.addView(getClass(), "ViewConnect", "/assets/viewConnect.fxml");
+        UtilsViews.addView(getClass(), "ViewWaiting", "/assets/viewWaiting.fxml");
+        UtilsViews.addView(getClass(), "ViewResult", "/assets/viewResult.fxml");
+        UtilsViews.addView(getClass(), "ViewGame", "/assets/viewGame.fxml");
 
+        UtilsViews.setView("ViewConnect");
+        
+        Scene scene = new Scene(UtilsViews.parentContainer);
+        
         stage.setScene(scene);
-        stage.setTitle("Exemple 0606 - Tanks");
+        stage.setTitle("Tanks");
         stage.setResizable(false);
 
         if (!System.getProperty("os.name").contains("Mac")) {

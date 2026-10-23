@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+
+<VBox alignment="CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="540.0" prefWidth="800.0" spacing="10.0" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.project.CtrlConnect">
+   <children>
+      <Label text="TANKS">
+         <font>
+            <Font size="40.0" />
+         </font>
+      </Label>
+      <Label text="Servidor">
+         <font>
+            <Font size="22.0" />
+         </font>
+      </Label>
+      <TextField fx:id="txtServer" alignment="CENTER" maxWidth="300.0" text="wss://imurielperez.ieti.site">
+         <VBox.margin>
+            <Insets />
+         </VBox.margin>
+      </TextField>
+      <Label text="Nombre del jugador">
+         <font>
+            <Font size="20.0" />
+         </font>
+      </Label>
+      <TextField fx:id="txtName" alignment="CENTER" maxWidth="300.0" />
+      <Button mnemonicParsing="false" onAction="#actionConnect" text="Conectar" />
+      <Label fx:id="lblError" textFill="RED" />
+   </children>
+</VBox>

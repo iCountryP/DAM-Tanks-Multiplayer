@@ -30,6 +30,10 @@ class Tank extends ObjectDynamic {
         return color;
     }
 
+    void setTurretAngle(double turretAngle) {
+        this.turretAngle = turretAngle;
+    }
+
     double getTurretAngle() {
         return turretAngle;
     }

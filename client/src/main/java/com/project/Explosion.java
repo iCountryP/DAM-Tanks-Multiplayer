@@ -30,6 +30,10 @@ class Explosion {
         return remaining <= 0;
     }
 
+    Point2D getPosition() {
+        return position;
+    }
+
     // Dibuixar l'explosió al canvas
     void draw(GraphicsContext gc) {
 
