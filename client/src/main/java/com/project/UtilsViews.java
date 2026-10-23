@@ -12,8 +12,15 @@ public class UtilsViews {
     public static final StackPane parentContainer = new StackPane();
     // Controlador de cada vista, guardado por su nombre
     private static final Map<String, Object> controllers = new HashMap<>();
+    
+    private static String currentView = "";
+
+    public static String getCurrentView() {
+        return currentView;
+    }
 
     public static void setView(String name) {
+        currentView = name;
         for (Node view : parentContainer.getChildren()) {
             boolean show = name.equals(view.getId());
             view.setVisible(show);

@@ -44,17 +44,28 @@ public class GameClient extends WebSocketClient {
             System.out.println("Recibido: " + message);
         }
 
-        Platform.runLater(() -> handleMessage(type, msg));
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                handleMessage(type, msg);
+            }
+        });
     }
 
     private void handleMessage(String type, JsonObject msg) {
         CtrlWaiting ctrlWaiting = (CtrlWaiting) UtilsViews.getController("ViewWaiting");
+        CtrlGame ctrlGame = (CtrlGame) UtilsViews.getController("ViewGame");
 
-        switch (type) {
-            case "WELCOME" -> playerId = msg.get("playerId").getAsInt();
-            case "WAITING" -> ctrlWaiting.showWaiting();
-            case "COUNTDOWN" -> ctrlWaiting.showCountdown(msg.get("seconds").getAsInt());
-            case "START" -> UtilsViews.setView("ViewGame");
+        if (type.equals("WELCOME")) {
+            playerId = msg.get("playerId").getAsInt();
+        } else if (type.equals("WAITING")) {
+            ctrlWaiting.showWaiting();
+        } else if (type.equals("COUNTDOWN")) {
+            ctrlWaiting.showCountdown(msg.get("seconds").getAsInt());
+        } else if (type.equals("START")) {
+            UtilsViews.setView("ViewGame");
+        } else if (type.equals("STATE")) {
+            ctrlGame.updateState(msg);
         }
     }
 
