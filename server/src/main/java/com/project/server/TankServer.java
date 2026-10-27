@@ -16,19 +16,28 @@ import com.google.gson.JsonParser;
 
 public class TankServer extends WebSocketServer {
 
-    // Jugadores, balas y explosiones de la partida
+    // Datos de la partida
     private final List<TankPlayer> jugadores = new ArrayList<>();
     private final List<TankBullet> balas = new ArrayList<>();
+    private final List<TankWall> paredes = new ArrayList<>();
     private final List<JsonObject> explosiones = new ArrayList<>();
 
     private final Gson gson = new Gson();
 
     private boolean partidaIniciada = false;
     private boolean cuentaAtrasActiva = false;
+    private boolean partidaTerminada = false;
+
     private int versionCuentaAtras = 0;
+
+    // Jugadores que han solicitado una revancha
+    private final List<Integer> jugadoresListos = new ArrayList<>();
 
     private static final int MAX_BALAS = 4;
     private static final double RADIO_TANQUE = 20;
+
+    private String escenario = "Arena";
+    private int siguienteEscenario = 0;
 
     public TankServer(int port) {
         super(new InetSocketAddress("0.0.0.0", port));
@@ -36,10 +45,11 @@ public class TankServer extends WebSocketServer {
 
     @Override
     public void onStart() {
+
         System.out.println("Servidor Tanks iniciado en el puerto 3000");
         System.out.println("Esperando jugadores...");
 
-        // Actualizamos el juego cada 50 milisegundos
+        // Bucle principal del juego
         Thread hiloJuego = new Thread(() -> {
 
             while (!Thread.currentThread().isInterrupted()) {
@@ -48,24 +58,18 @@ public class TankServer extends WebSocketServer {
 
                     if (partidaIniciada && jugadores.size() == 2) {
 
-                        // Actualizamos los tanques
-                        for (TankPlayer jugador : jugadores) {
-                            jugador.actualizar(0.05);
-                        }
-
-                        // Actualizamos las balas y comprobamos impactos
+                        actualizarJugadores();
                         actualizarBalas();
 
-                        // Enviamos el estado a los jugadores
+                        // Enviamos el estado actualizado
                         enviarEstado();
-
-                        // Reducimos la duracion de las explosiones
                         actualizarExplosiones();
                     }
                 }
 
                 try {
                     Thread.sleep(50);
+
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;
@@ -80,8 +84,9 @@ public class TankServer extends WebSocketServer {
     @Override
     public synchronized void onOpen(WebSocket conn, ClientHandshake handshake) {
 
-        // Solo dejamos entrar a dos jugadores
+        // Solo permitimos dos jugadores
         if (jugadores.size() >= 2) {
+
             conn.send("{\"type\":\"ERROR\",\"message\":\"Partida completa\"}");
             conn.close();
             return;
@@ -96,14 +101,14 @@ public class TankServer extends WebSocketServer {
 
         conn.send("{\"type\":\"WELCOME\",\"playerId\":" + id + "}");
 
-        // Esperamos a que los dos envien JOIN
         enviarATodos("{\"type\":\"WAITING\"}");
     }
 
-    // Buscamos el jugador que ha enviado un mensaje
+    // Buscamos el jugador asociado a una conexion
     private TankPlayer buscarJugador(WebSocket conn) {
 
         for (TankPlayer jugador : jugadores) {
+
             if (jugador.conexion == conn) {
                 return jugador;
             }
@@ -112,17 +117,18 @@ public class TankServer extends WebSocketServer {
         return null;
     }
 
-    // Enviamos el mismo mensaje a los dos jugadores
+    // Enviamos un mensaje a los jugadores conectados
     private void enviarATodos(String mensaje) {
 
         for (TankPlayer jugador : jugadores) {
+
             if (jugador.conexion.isOpen()) {
                 jugador.conexion.send(mensaje);
             }
         }
     }
 
-    // Comprobamos si los dos jugadores tienen nombre
+    // Comprobamos que ambos jugadores tengan nombre
     private boolean jugadoresPreparados() {
 
         if (jugadores.size() != 2) {
@@ -130,6 +136,7 @@ public class TankServer extends WebSocketServer {
         }
 
         for (TankPlayer jugador : jugadores) {
+
             if (jugador.name.isEmpty()) {
                 return false;
             }
@@ -138,7 +145,75 @@ public class TankServer extends WebSocketServer {
         return true;
     }
 
-    // Iniciamos la cuenta atras
+    // Seleccionamos el escenario de la partida
+    private void cargarEscenario() {
+
+        paredes.clear();
+
+        if (siguienteEscenario == 0) {
+
+            escenario = "Arena";
+
+            // Pared central
+            paredes.add(new TankWall(380, 150, 40, 200));
+
+        } else if (siguienteEscenario == 1) {
+
+            escenario = "Pasillos";
+
+            // Cuatro paredes con pasillos centrales
+            paredes.add(new TankWall(230, 50, 40, 160));
+            paredes.add(new TankWall(230, 290, 40, 160));
+
+            paredes.add(new TankWall(530, 50, 40, 160));
+            paredes.add(new TankWall(530, 290, 40, 160));
+
+        } else {
+
+            escenario = "Obstaculos";
+
+            // Obstaculos repartidos por el escenario
+            paredes.add(new TankWall(260, 90, 60, 100));
+            paredes.add(new TankWall(480, 310, 60, 100));
+            paredes.add(new TankWall(370, 215, 60, 70));
+        }
+
+        // Preparamos el siguiente escenario
+        siguienteEscenario++;
+
+        if (siguienteEscenario >= 3) {
+            siguienteEscenario = 0;
+        }
+
+        System.out.println("Escenario seleccionado: " + escenario);
+    }
+
+    // Restauramos las vidas y posiciones iniciales
+    private void prepararJugadores() {
+
+        for (TankPlayer jugador : jugadores) {
+
+            jugador.detener();
+            jugador.lives = 3;
+
+            if (jugador.id == 1) {
+
+                jugador.x = 100;
+                jugador.y = 250;
+                jugador.angle = 0;
+
+            } else {
+
+                jugador.x = 700;
+                jugador.y = 250;
+                jugador.angle = 180;
+            }
+
+            jugador.turretAngle = jugador.angle;
+        }
+    }
+
+    // Cuenta atras antes de empezar una partida
     private void iniciarCuentaAtras() {
 
         if (cuentaAtrasActiva || partidaIniciada) {
@@ -161,11 +236,13 @@ public class TankServer extends WebSocketServer {
                         return;
                     }
 
-                    enviarATodos("{\"type\":\"COUNTDOWN\",\"seconds\":" + i + "}");
+                    enviarATodos(
+                            "{\"type\":\"COUNTDOWN\",\"seconds\":" + i + "}");
                 }
 
                 try {
                     Thread.sleep(1000);
+
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;
@@ -179,18 +256,29 @@ public class TankServer extends WebSocketServer {
                     return;
                 }
 
-                // Limpiamos los datos de la partida anterior
+                // Limpiamos los datos anteriores
                 balas.clear();
                 explosiones.clear();
+
+                // Preparamos el nuevo escenario y los tanques
+                cargarEscenario();
+                prepararJugadores();
+
+                // Reiniciamos el estado de la revancha
+                jugadoresListos.clear();
+                partidaTerminada = false;
 
                 partidaIniciada = true;
                 cuentaAtrasActiva = false;
 
-                for (TankPlayer jugador : jugadores) {
-                    jugador.detener();
-                }
+                // Enviamos el escenario a los dos jugadores
+                JsonObject inicio = new JsonObject();
 
-                enviarATodos("{\"type\":\"START\"}");
+                inicio.addProperty("type", "START");
+                inicio.addProperty("scenario", escenario);
+                inicio.add("walls", gson.toJsonTree(paredes));
+
+                enviarATodos(gson.toJson(inicio));
 
                 System.out.println("Partida iniciada");
             }
@@ -200,12 +288,103 @@ public class TankServer extends WebSocketServer {
         hilo.start();
     }
 
-    // Contamos las balas activas de un jugador
+    // Registramos los jugadores que quieren volver a jugar
+    private void prepararRevancha(TankPlayer jugador) {
+
+        // Solo permitimos revancha cuando acaba una partida
+        if (!partidaTerminada || cuentaAtrasActiva) {
+            return;
+        }
+
+        // Evitamos registrar dos veces al mismo jugador
+        if (!jugadoresListos.contains(jugador.id)) {
+
+            jugadoresListos.add(jugador.id);
+
+            System.out.println(jugador.name + " quiere volver a jugar");
+        }
+
+        // Informamos a ambos jugadores
+        JsonObject mensaje = new JsonObject();
+
+        mensaje.addProperty("type", "REMATCH_WAITING");
+        mensaje.addProperty("ready", jugadoresListos.size());
+        mensaje.addProperty("total", 2);
+
+        enviarATodos(gson.toJson(mensaje));
+
+        // Cuando los dos aceptan comienza la nueva cuenta atras
+        if (jugadoresListos.size() == 2 && jugadoresPreparados()) {
+
+            System.out.println("Revancha aceptada por ambos jugadores");
+
+            iniciarCuentaAtras();
+        }
+    }
+
+    // Comprobamos si un tanque toca una pared
+    private boolean colisionaPared(double x, double y) {
+
+        for (TankWall pared : paredes) {
+
+            if (pared.colisiona(x, y, RADIO_TANQUE)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Evitamos que los tanques se atraviesen entre ellos
+    private boolean colisionaOtroTanque(TankPlayer jugador) {
+
+        for (TankPlayer otro : jugadores) {
+
+            if (otro == jugador) {
+                continue;
+            }
+
+            double dx = jugador.x - otro.x;
+            double dy = jugador.y - otro.y;
+
+            double distanciaCuadrado = dx * dx + dy * dy;
+            double radioTotal = RADIO_TANQUE * 2;
+
+            if (distanciaCuadrado < radioTotal * radioTotal) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Movemos los tanques comprobando colisiones
+    private void actualizarJugadores() {
+
+        for (TankPlayer jugador : jugadores) {
+
+            double anteriorX = jugador.x;
+            double anteriorY = jugador.y;
+
+            jugador.actualizar(0.05);
+
+            // Si choca, vuelve a la posicion anterior
+            if (colisionaPared(jugador.x, jugador.y)
+                    || colisionaOtroTanque(jugador)) {
+
+                jugador.x = anteriorX;
+                jugador.y = anteriorY;
+            }
+        }
+    }
+
+    // Contamos los proyectiles activos de un jugador
     private int contarBalas(int id) {
 
         int cantidad = 0;
 
         for (TankBullet bala : balas) {
+
             if (bala.ownerId == id) {
                 cantidad++;
             }
@@ -214,7 +393,7 @@ public class TankServer extends WebSocketServer {
         return cantidad;
     }
 
-    // Creamos una bala si no ha llegado al limite
+    // Creamos un proyectil si no se ha alcanzado el limite
     private void disparar(TankPlayer jugador) {
 
         if (contarBalas(jugador.id) >= MAX_BALAS) {
@@ -222,38 +401,60 @@ public class TankServer extends WebSocketServer {
         }
 
         TankBullet bala = new TankBullet(jugador);
+
         balas.add(bala);
 
         System.out.println(jugador.name + " ha disparado");
     }
 
-    // Actualizamos las balas y comprobamos si impactan
+    // Actualizamos las balas y detectamos impactos
     private void actualizarBalas() {
 
         for (int i = balas.size() - 1; i >= 0; i--) {
 
             TankBullet bala = balas.get(i);
 
-            // Guardamos la posicion anterior para comprobar el recorrido
             double anteriorX = bala.x;
             double anteriorY = bala.y;
 
             bala.actualizar(0.05);
 
-            boolean impacto = false;
+            boolean impactoPared = false;
 
+            // Comprobamos primero las paredes
+            for (TankWall pared : paredes) {
+
+                if (pared.colisionaBala(
+                        anteriorX, anteriorY, bala.x, bala.y)) {
+
+                    impactoPared = true;
+
+                    crearExplosion(bala.x, bala.y);
+                    break;
+                }
+            }
+
+            if (impactoPared) {
+
+                balas.remove(i);
+                continue;
+            }
+
+            boolean impactoTanque = false;
+
+            // Comprobamos si la bala impacta contra un enemigo
             for (TankPlayer jugador : jugadores) {
 
-                // Una bala no puede dañar a su propietario
+                // No permitimos que un jugador se dispare a si mismo
                 if (jugador.id == bala.ownerId || jugador.lives <= 0) {
                     continue;
                 }
 
-                if (balaImpactaTanque(anteriorX, anteriorY, bala, jugador)) {
+                if (balaImpactaTanque(
+                        anteriorX, anteriorY, bala, jugador)) {
 
-                    impacto = true;
+                    impactoTanque = true;
 
-                    // Restamos una vida al jugador
                     jugador.lives--;
 
                     System.out.println(jugador.name
@@ -262,7 +463,7 @@ public class TankServer extends WebSocketServer {
 
                     crearExplosion(bala.x, bala.y);
 
-                    // Si no le quedan vidas, termina la partida
+                    // Terminamos la partida si se queda sin vidas
                     if (jugador.lives <= 0) {
                         terminarPartida(jugador);
                     }
@@ -271,19 +472,20 @@ public class TankServer extends WebSocketServer {
                 }
             }
 
-            // Eliminamos las balas que impactan o terminan su recorrido
-            if (impacto || bala.haTerminado()) {
+            // Eliminamos las balas que impactan o caducan
+            if (impactoTanque || bala.haTerminado()) {
                 balas.remove(i);
             }
 
             if (!partidaIniciada) {
+
                 balas.clear();
                 break;
             }
         }
     }
 
-    // Comprobamos si el recorrido de una bala toca un tanque
+    // Detectamos si el recorrido de una bala toca un tanque
     private boolean balaImpactaTanque(double anteriorX, double anteriorY,
             TankBullet bala, TankPlayer jugador) {
 
@@ -295,6 +497,7 @@ public class TankServer extends WebSocketServer {
         double t = 0;
 
         if (longitudCuadrado > 0) {
+
             t = ((jugador.x - anteriorX) * dx
                     + (jugador.y - anteriorY) * dy) / longitudCuadrado;
         }
@@ -313,7 +516,7 @@ public class TankServer extends WebSocketServer {
         return distanciaCuadrado <= RADIO_TANQUE * RADIO_TANQUE;
     }
 
-    // Guardamos una explosion cuando hay un impacto
+    // Creamos una explosion visual cuando hay un impacto
     private void crearExplosion(double x, double y) {
 
         JsonObject explosion = new JsonObject();
@@ -326,7 +529,7 @@ public class TankServer extends WebSocketServer {
         explosiones.add(explosion);
     }
 
-    // Quitamos las explosiones despues de unos instantes
+    // Eliminamos las explosiones despues de unos instantes
     private void actualizarExplosiones() {
 
         for (int i = explosiones.size() - 1; i >= 0; i--) {
@@ -336,20 +539,25 @@ public class TankServer extends WebSocketServer {
             int ticks = explosion.get("ticks").getAsInt() - 1;
 
             if (ticks <= 0) {
+
                 explosiones.remove(i);
+
             } else {
+
                 explosion.addProperty("ticks", ticks);
             }
         }
     }
 
-    // Comprobamos quien ha ganado
+    // Finalizamos la partida y comunicamos el ganador
     private void terminarPartida(TankPlayer perdedor) {
 
         TankPlayer ganador = null;
 
         for (TankPlayer jugador : jugadores) {
+
             if (jugador != perdedor) {
+
                 ganador = jugador;
                 break;
             }
@@ -360,12 +568,17 @@ public class TankServer extends WebSocketServer {
         }
 
         partidaIniciada = false;
+        partidaTerminada = true;
+
+        // Reiniciamos las solicitudes de revancha
+        jugadoresListos.clear();
 
         for (TankPlayer jugador : jugadores) {
             jugador.detener();
         }
 
         JsonObject resultado = new JsonObject();
+
         resultado.addProperty("type", "GAME_OVER");
         resultado.addProperty("winner", ganador.name);
         resultado.addProperty("loser", perdedor.name);
@@ -375,10 +588,11 @@ public class TankServer extends WebSocketServer {
         System.out.println("Partida terminada. Ganador: " + ganador.name);
     }
 
-    // Enviamos el estado de la partida
+    // Enviamos el estado completo a ambos jugadores
     private void enviarEstado() {
 
         JsonObject estado = new JsonObject();
+
         estado.addProperty("type", "STATE");
 
         JsonArray tanques = new JsonArray();
@@ -401,7 +615,7 @@ public class TankServer extends WebSocketServer {
 
         estado.add("players", tanques);
 
-        // Enviamos las balas
+        // Informacion de las balas activas
         JsonArray proyectiles = new JsonArray();
 
         for (TankBullet bala : balas) {
@@ -417,9 +631,11 @@ public class TankServer extends WebSocketServer {
         }
 
         estado.add("bullets", proyectiles);
-        estado.add("walls", new JsonArray());
 
-        // Enviamos las explosiones que siguen activas
+        // Enviamos las paredes del escenario
+        estado.add("walls", gson.toJsonTree(paredes));
+
+        // Enviamos las explosiones activas
         JsonArray listaExplosiones = new JsonArray();
 
         for (JsonObject explosion : explosiones) {
@@ -428,7 +644,8 @@ public class TankServer extends WebSocketServer {
 
             datos.addProperty("x", explosion.get("x").getAsDouble());
             datos.addProperty("y", explosion.get("y").getAsDouble());
-            datos.addProperty("radius", explosion.get("radius").getAsDouble());
+            datos.addProperty(
+                    "radius", explosion.get("radius").getAsDouble());
 
             listaExplosiones.add(datos);
         }
@@ -448,21 +665,24 @@ public class TankServer extends WebSocketServer {
         }
 
         try {
+
             JsonObject json = JsonParser.parseString(message).getAsJsonObject();
             String tipo = json.get("type").getAsString();
 
-            // Registramos el nombre del jugador
+            // El jugador introduce su nombre
             if (tipo.equals("JOIN")) {
 
                 String nombre = json.get("name").getAsString().trim();
 
                 if (!nombre.isEmpty() && nombre.length() <= 30) {
 
-                    if (!partidaIniciada && !cuentaAtrasActiva) {
+                    if (!partidaIniciada && !cuentaAtrasActiva
+                            && !partidaTerminada) {
 
                         jugador.name = nombre;
 
-                        System.out.println("Jugador " + jugador.id + ": " + nombre);
+                        System.out.println("Jugador "
+                                + jugador.id + ": " + nombre);
 
                         if (jugadoresPreparados()) {
                             iniciarCuentaAtras();
@@ -470,11 +690,13 @@ public class TankServer extends WebSocketServer {
                     }
 
                 } else {
-                    conn.send("{\"type\":\"ERROR\",\"message\":\"Nombre incorrecto\"}");
+
+                    conn.send(
+                            "{\"type\":\"ERROR\",\"message\":\"Nombre incorrecto\"}");
                 }
             }
 
-            // Guardamos las teclas pulsadas
+            // Actualizamos las teclas de movimiento
             if (tipo.equals("INPUT") && partidaIniciada) {
 
                 jugador.up = json.get("up").getAsBoolean();
@@ -483,7 +705,7 @@ public class TankServer extends WebSocketServer {
                 jugador.right = json.get("right").getAsBoolean();
             }
 
-            // Orientamos la torreta
+            // Orientamos la torreta hacia el raton
             if (tipo.equals("AIM") && partidaIniciada) {
 
                 double mouseX = json.get("x").getAsDouble();
@@ -494,18 +716,26 @@ public class TankServer extends WebSocketServer {
                 }
             }
 
-            // Disparamos
+            // Creamos un nuevo disparo
             if (tipo.equals("FIRE") && partidaIniciada) {
                 disparar(jugador);
             }
 
+            // Solicitamos una nueva partida
+            if (tipo.equals("READY")) {
+                prepararRevancha(jugador);
+            }
+
         } catch (Exception e) {
-            conn.send("{\"type\":\"ERROR\",\"message\":\"Mensaje incorrecto\"}");
+
+            conn.send(
+                    "{\"type\":\"ERROR\",\"message\":\"Mensaje incorrecto\"}");
         }
     }
 
     @Override
-    public synchronized void onClose(WebSocket conn, int code, String reason, boolean remote) {
+    public synchronized void onClose(WebSocket conn, int code,
+            String reason, boolean remote) {
 
         TankPlayer jugador = buscarJugador(conn);
 
@@ -517,14 +747,19 @@ public class TankServer extends WebSocketServer {
 
         System.out.println("Jugador " + jugador.id + " desconectado");
 
-        // Reiniciamos el juego si alguien se desconecta
+        // Cancelamos cualquier partida o revancha pendiente
         versionCuentaAtras++;
+
         cuentaAtrasActiva = false;
         partidaIniciada = false;
+        partidaTerminada = false;
 
+        jugadoresListos.clear();
         balas.clear();
+        paredes.clear();
         explosiones.clear();
 
+        // El jugador restante vuelve a la sala de espera
         if (jugadores.size() == 1) {
 
             TankPlayer restante = jugadores.get(0);
@@ -539,7 +774,9 @@ public class TankServer extends WebSocketServer {
             restante.turretAngle = 0;
             restante.lives = 3;
 
-            restante.conexion.send("{\"type\":\"WELCOME\",\"playerId\":1}");
+            restante.conexion.send(
+                    "{\"type\":\"WELCOME\",\"playerId\":1}");
+
             enviarATodos("{\"type\":\"WAITING\"}");
         }
     }
@@ -550,6 +787,7 @@ public class TankServer extends WebSocketServer {
     }
 
     public static void main(String[] args) {
+
         TankServer server = new TankServer(3000);
         server.start();
     }
